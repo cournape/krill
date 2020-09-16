@@ -32,11 +32,33 @@ def main(screen):
     rows = 10
     cols = 10
 
-    top_x = 0
-    top_y = 0
+    top_x = 20
+    top_y = 5
 
-    window = curses.newwin(rows, cols, top_y, top_x)
-    window.addch(0, 0, "@")
+    msg = "Type any char to fill the window:"
+    screen.addstr(msg)
+    screen.refresh()
+
+    fill_char = screen.getch()
+
+    grid = [
+        [None for _ in range(cols)]
+        for _ in range(rows)
+    ]
+    for i in range(rows):
+        for j in range(cols):
+            if (i + j) % 2 == 0:
+                c = fill_char
+            else:
+                c = " "
+            grid[i][j] = c
+
+    # +1 as a hack to avoid ERR when writing on lower right corner
+    window = curses.newwin(rows, cols + 1, top_y, top_x)
+
+    for i, row in enumerate(grid):
+        for j, c in enumerate(row):
+            window.addch(i, j, c)
 
     window.refresh()
 
@@ -49,6 +71,8 @@ if __name__ == "__main__":
         with noecho():
             # Receive arrow keys, etc.
             with keypad(screen):
+                # Hide cursor
+                curses.curs_set(0)
                 main(screen)
                 curses.napms(2000)
     finally:
