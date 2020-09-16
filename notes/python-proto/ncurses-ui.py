@@ -115,8 +115,8 @@ def main(screen):
     cursor = Cursor(0, 0, rows, cols)
 
     def clear_window():
-        window.move(0, 0)
-        for _ in range(rows):
+        for i in range(rows):
+            window.move(i, 0)
             window.addstr(" " * cols)
 
     def draw_cursor(cursor):
