@@ -1,8 +1,11 @@
 import contextlib
 import dataclasses
+import enum
+import logging
 
 import curses
 
+logger = logging.getLogger(__name__)
 
 CURSOR_GLYPH = "@"
 CROSS_GLYPH = "+"
@@ -55,6 +58,44 @@ class Cursor:
         self.y = max(0, min(self.y + y, self.height - 1))
 
 
+@enum.unique
+class CursesColor(enum.IntEnum):
+    DEFAULT = -1
+    BLACK = 0
+    RED = 1
+    GREEN = 2
+    YELLOW = 3
+    BLUE = 4
+    MAGENTA = 5
+    CYAN = 6
+    WHITE = 7
+
+
+N_COLOR_BASE = len(CursesColor)
+
+
+def init_colors():
+    curses.use_default_colors()
+
+    # Undocumented: -1 refers to default color, assuming use_default_colors has
+    # been called first
+    for i in range(N_COLOR_BASE):
+        for j in range(N_COLOR_BASE):
+            c = 1 + i * N_COLOR_BASE + j
+            fg = i - 1
+            bg = j - 1
+            logger.debug("%d -> {%s:%d, %s:%d}", c, CursesColor(fg), fg, CursesColor(bg), bg)
+            curses.init_pair(c, fg, bg)
+
+
+def pair_to_index(fg, bg):
+    return 1 + (fg + 1) * N_COLOR_BASE + bg + 1
+
+
+def color_from_pair(fg, bg):
+    return curses.color_pair(pair_to_index(fg, bg))
+
+
 def main(screen):
     rows = 10
     cols = 10
@@ -62,23 +103,10 @@ def main(screen):
     top_x = 20
     top_y = 5
 
-    #msg = "Type any char to fill the window:"
-    #screen.addstr(msg)
-    #screen.refresh()
+    # Must be called before any color setup
+    curses.start_color()
 
-    #fill_char = screen.getch()
-
-    #grid = [
-    #    [None for _ in range(cols)]
-    #    for _ in range(rows)
-    #]
-    #for i in range(rows):
-    #    for j in range(cols):
-    #        if (i + j) % 2 == 0:
-    #            c = fill_char
-    #        else:
-    #            c = " "
-    #        grid[i][j] = c
+    init_colors()
 
     # +1 as a hack to avoid ERR when writing on lower right corner
     window = curses.newwin(rows, cols + 1, top_y, top_x)
@@ -93,11 +121,15 @@ def main(screen):
 
     def draw_cursor(cursor):
         window.move(cursor.y, cursor.x)
-        window.addch(CURSOR_GLYPH)
+        window.addch(
+            CURSOR_GLYPH,
+            curses.A_REVERSE | curses.A_BOLD
+            | color_from_pair(CursesColor.YELLOW, CursesColor.DEFAULT)
+        )
 
     clear_window()
 
-    screen.addstr(0, 0, f"Cursor new pos: {cursor.x, cursor.y}")
+    screen.addstr(0, 0, f"Cursor new pos: {cursor.x, cursor.y} / color pair: {pair_to_index(curses.COLOR_RED, -1)}")
     screen.refresh()
 
     draw_cursor(cursor)
@@ -127,6 +159,7 @@ def main(screen):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG, filename="curses-ui.log")
     screen = curses.initscr()
 
     try:
