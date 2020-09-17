@@ -1,9 +1,12 @@
 import contextlib
+import curses
 import dataclasses
 import enum
 import logging
+import sys
 
-import curses
+import orca_format
+
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +87,6 @@ def init_colors():
             c = 1 + i * N_COLOR_BASE + j
             fg = i - 1
             bg = j - 1
-            logger.debug("%d -> {%s:%d, %s:%d}", c, CursesColor(fg), fg, CursesColor(bg), bg)
             curses.init_pair(c, fg, bg)
 
 
@@ -95,10 +97,100 @@ def pair_to_index(fg, bg):
 def color_from_pair(fg, bg):
     return curses.color_pair(pair_to_index(fg, bg))
 
+GLYPH_TABLE = [
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', #  0-11
+    'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', # 12-23
+    'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', # 24-35
+]
+GLYPH_SIZE = len(GLYPH_TABLE)
+INDEX_TO_GLYPH = {k: i for i, k in enumerate(GLYPH_TABLE)}
 
-def main(screen):
-    rows = 10
-    cols = 10
+ORD_0 = ord('0')
+ORD_9 = ord('9')
+ORD_a = ord('a')
+ORD_z = ord('z')
+ORD_A = ord('A')
+ORD_Z = ord('Z')
+
+
+def index_of_orca_js(c):
+    return INDEX_TO_GLYPH.get(c.lower(), -1)
+
+
+def index_of_orca_c(c):
+    ord_c = ord(c)
+    if ord_c >= ORD_0 and ord_c <= ORD_9:
+        return ord_c - ORD_0
+    elif ord_c >= ORD_a and ord_c <= ORD_z:
+        return ord_c - ORD_a
+    elif ord_c >= ORD_A and ord_c <= ORD_Z:
+        return ord_c - ORD_A
+    else:
+        return 0
+
+
+index_of = index_of_orca_js
+
+
+def peek(grid, i, j):
+    """ Returns the glyph at the given indices.
+
+    Will return no-op (".") if outside the grid boundaries.
+    """
+    try:
+        return grid[i][j]
+    except IndexError:
+        return "."
+
+
+def poke(grid, i, j, value):
+    """ Will set the given value at the given position in the grid.
+
+    Will do nothing if outside the grid boundaries.
+    """
+    try:
+        grid[i][j] = value
+    except IndexError:
+        return
+
+
+def operator_add(grid, i, j):
+    a = peek(grid, i, j - 1)
+    b = peek(grid, i, j + 1)
+    index = index_of(a) + index_of(b)
+    value = GLYPH_TABLE[index % GLYPH_SIZE]
+    logger.debug("add: %s, %s -> table[%d] = %s", a, b, index, value)
+    # FIXME: orca-js seems to have complicated logic about when to upper the
+    # output in this case, based on the operator sensitivity and the right
+    # operand.
+    if b.isupper():
+        value = value.upper()
+    poke(grid, i + 1, j, value)
+
+
+def update_grid(grid):
+    for i, row in enumerate(grid):
+        for j, c in enumerate(row):
+            if c == ".":
+                continue
+            elif c == "A":
+                operator_add(grid, i, j)
+            else:
+                pass
+
+
+def render_grid(window, grid):
+    # Render grid
+    for i, row in enumerate(grid):
+        window.move(i, 0)
+        window.addstr("".join(row))
+
+
+def main(screen, path):
+    grid = orca_format.load_orca_file(path)
+
+    rows = len(grid)
+    cols = len(grid[0])
 
     top_x = 20
     top_y = 5
@@ -129,10 +221,13 @@ def main(screen):
 
     clear_window()
 
-    screen.addstr(0, 0, f"Cursor new pos: {cursor.x, cursor.y} / color pair: {pair_to_index(curses.COLOR_RED, -1)}")
+    screen.addstr(0, 0, f"Cursor new pos: {cursor.x, cursor.y}")
     screen.refresh()
 
+    update_grid(grid)
+    render_grid(window, grid)
     draw_cursor(cursor)
+
     window.refresh()
 
     while True:
@@ -149,10 +244,12 @@ def main(screen):
             pass
 
         screen.addstr(0, 0, f"Cursor new pos: {cursor.x, cursor.y}")
-        screen.addstr(1, 0, f"Key pressed: {k} vs {curses.KEY_UP}       ")
         screen.refresh()
 
         clear_window()
+
+        update_grid(grid)
+        render_grid(window, grid)
         draw_cursor(cursor)
 
         window.refresh()
@@ -169,7 +266,7 @@ if __name__ == "__main__":
             with keypad(screen):
                 # Hide cursor
                 curses.curs_set(0)
-                main(screen)
+                main(screen, sys.argv[1])
                 curses.napms(2000)
     finally:
         curses.endwin()
