@@ -132,31 +132,54 @@ def index_of_orca_c(c):
 index_of = index_of_orca_js
 
 
-def peek(grid, i, j):
-    """ Returns the glyph at the given indices.
+class KrillGrid:
+    @classmethod
+    def from_path(cls, path):
+        raw = orca_format.load_orca_file(path)
 
-    Will return no-op (".") if outside the grid boundaries.
-    """
-    try:
-        return grid[i][j]
-    except IndexError:
-        return "."
+        rows = len(raw)
+        cols = len(raw[0])
+        ret = cls(rows, cols)
+        ret._state = raw
+        return ret
 
+    def __init__(self, rows, cols):
+        self.rows = rows
+        self.cols = cols
 
-def poke(grid, i, j, value):
-    """ Will set the given value at the given position in the grid.
+        # Raw state of the grid at a given state
+        self._state = [
+            ["." for _ in range(cols)]
+            for _ in range(rows)
+        ]
 
-    Will do nothing if outside the grid boundaries.
-    """
-    try:
-        grid[i][j] = value
-    except IndexError:
-        return
+    def iter_rows(self):
+        return iter(self._state)
+
+    def peek(self, i, j):
+        """ Returns the glyph at the given indices.
+
+        Will return no-op (".") if outside the grid boundaries.
+        """
+        try:
+            return self._state[i][j]
+        except IndexError:
+            return "."
+
+    def poke(self, i, j, value):
+        """ Will set the given value at the given position in the grid.
+
+        Will do nothing if outside the grid boundaries.
+        """
+        try:
+            self._state[i][j] = value
+        except IndexError:
+            return
 
 
 def operator_add(grid, i, j):
-    a = peek(grid, i, j - 1)
-    b = peek(grid, i, j + 1)
+    a = grid.peek(i, j - 1)
+    b = grid.peek(i, j + 1)
     index = index_of(a) + index_of(b)
     value = GLYPH_TABLE[index % GLYPH_SIZE]
     logger.debug("add: %s, %s -> table[%d] = %s", a, b, index, value)
@@ -165,11 +188,11 @@ def operator_add(grid, i, j):
     # operand.
     if b.isupper():
         value = value.upper()
-    poke(grid, i + 1, j, value)
+    grid.poke(i + 1, j, value)
 
 
 def update_grid(grid):
-    for i, row in enumerate(grid):
+    for i, row in enumerate(grid.iter_rows()):
         for j, c in enumerate(row):
             if c == ".":
                 continue
@@ -180,17 +203,13 @@ def update_grid(grid):
 
 
 def render_grid(window, grid):
-    # Render grid
-    for i, row in enumerate(grid):
+    for i, row in enumerate(grid.iter_rows()):
         window.move(i, 0)
         window.addstr("".join(row))
 
 
 def main(screen, path):
-    grid = orca_format.load_orca_file(path)
-
-    rows = len(grid)
-    cols = len(grid[0])
+    grid = KrillGrid.from_path(path)
 
     top_x = 20
     top_y = 5
@@ -201,15 +220,15 @@ def main(screen, path):
     init_colors()
 
     # +1 as a hack to avoid ERR when writing on lower right corner
-    window = curses.newwin(rows, cols + 1, top_y, top_x)
+    window = curses.newwin(grid.rows, grid.cols + 1, top_y, top_x)
     window.keypad(True)
 
-    cursor = Cursor(0, 0, rows, cols)
+    cursor = Cursor(0, 0, grid.rows, grid.cols)
 
     def clear_window():
-        for i in range(rows):
+        for i in range(grid.rows):
             window.move(i, 0)
-            window.addstr(" " * cols)
+            window.addstr(" " * grid.cols)
 
     def draw_cursor(cursor):
         window.move(cursor.y, cursor.x)
