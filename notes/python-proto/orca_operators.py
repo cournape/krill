@@ -1,27 +1,42 @@
+import abc
+import logging
+
+
+from orca_utils import glyph_table_index_of, glyph_table_value_at
+
+
+logger = logging.getLogger("operators")
+
+
 class IPort:
     pass
 
 
 class InputPort(IPort):
-    def __init__(self, x, y, *, clamp=None):
-        self._x = x
-        self._y = y
+    def __init__(self, x, y, *, clamp=None, default=None):
+        self.x = x
+        self.y = y
 
         self.clamp = clamp or default_clamp
+        self.default = default
 
 
 class OutputPort(IPort):
-    def __init__(self, x, y, *, clamp=None, sensitive=False):
-        self._x = x
-        self._y = y
+    def __init__(self, x, y, *, clamp=None, sensitive=False, bang=False):
+        self.x = x
+        self.y = y
 
         self.clamp = clamp or default_clamp
 
-        self.sensitive = sensitive
+        self.is_sensitive = sensitive
+
+        self.is_bang = bang
 
 
-class IOperator:
-    pass
+class IOperator(abc.ABC):
+    @abc.abstractmethod
+    def run(self, frame):
+        pass
 
 
 class Add(IOperator):
@@ -37,9 +52,29 @@ class Add(IOperator):
 
         self._grid = grid
 
+    def run(self, frame):
+        a_port = self.ports["a"]
+        b_port = self.ports["b"]
+        a = self._grid.peek(a_port.x, a_port.y)
+        b = self._grid.peek(b_port.x, b_port.y)
+
+        index = glyph_table_index_of(a) + glyph_table_index_of(b)
+        value = glyph_table_value_at(index)
+
+        logger.debug("add: %s, %s -> table[%d] = %s", a, b, index, value)
+
+        # FIXME: orca-js seems to have complicated logic about when to upper the
+        # output in this case, based on the operator sensitivity and the right
+        # operand.
+        if b.isupper():
+            value = value.upper()
+
+        output_port = self.ports["output"]
+        self._grid.poke(output_port.x, output_port.y, value)
+
 
 _CHAR_TO_OPERATOR_CLASS = {
-    "a": Add
+    "a": Add,
 }
 
 

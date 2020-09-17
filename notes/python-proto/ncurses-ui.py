@@ -121,26 +121,50 @@ class KrillGrid:
             for _ in range(rows)
         ]
 
+        # Each grid's position may be locked, in which case it should not be
+        # processed as an operator. For example, if the right operator of add
+        # is itself a letter, you want to make sure you're not considering it
+        # as its own operator. Here we rely on orca processing from the left to
+        # the right, and from the top to the bottom.
+        self._locks = None
+
+        self.reset_locks()
+
+    def reset_locks(self):
+        self._locks = [
+            [False for _ in range(self.cols)]
+            for _ in range(self.rows)
+        ]
+
     def iter_rows(self):
         return iter(self._state)
 
-    def peek(self, i, j):
+    def lock(self, x, y):
+        self._locks[y][x] = True
+
+    def is_operator_locked(self, operator):
+        return self.is_locked(operator.x, operator.y)
+
+    def is_locked(self, x, y):
+        return self._locks[y][x]
+
+    def peek(self, x, y):
         """ Returns the glyph at the given indices.
 
         Will return no-op (".") if outside the grid boundaries.
         """
         try:
-            return self._state[i][j]
+            return self._state[y][x]
         except IndexError:
             return "."
 
-    def poke(self, i, j, value):
+    def poke(self, x, y, value):
         """ Will set the given value at the given position in the grid.
 
         Will do nothing if outside the grid boundaries.
         """
         try:
-            self._state[i][j] = value
+            self._state[y][x] = value
         except IndexError:
             return
 
@@ -163,10 +187,10 @@ def operator_add(grid, i, j):
 
 def parse_grid(grid):
     operators = []
-    for i, row in enumerate(grid.iter_rows()):
-        for j, c in enumerate(row):
+    for y, row in enumerate(grid.iter_rows()):
+        for x, c in enumerate(row):
             if c != DOT_GLYPH:
-                operator = orca_operators.operator_factory(grid, c, i, j)
+                operator = orca_operators.operator_factory(grid, c, x, y)
                 if operator is not None:
                     operators.append(operator)
                 else:
@@ -175,9 +199,28 @@ def parse_grid(grid):
     return operators
 
 
-def update_grid(grid):
+def update_grid(grid, frame):
+    grid.reset_locks()
+
     operators = parse_grid(grid)
     logger.debug("Found %d operators", len(operators))
+
+    for operator in operators:
+        logger.debug("Looking at operator %s, pos %d, %d", operator, operator.x, operator.y)
+        for port in operator.ports.values():
+            if isinstance(port, orca_operators.OutputPort) and port.is_bang:
+                continue
+
+            logger.debug("Locking port @ %d, %d", port.x, port.y)
+            grid.lock(port.x, port.y)
+
+    operators = [
+        operator for operator in operators if not grid.is_operator_locked(operator)
+    ]
+    logger.debug("Found %d unlocked operators", len(operators))
+
+    for operator in operators:
+        operator.run(frame)
 
 
 def render_grid(window, grid):
@@ -191,6 +234,8 @@ def main(screen, path):
 
     top_x = 20
     top_y = 5
+
+    frame = 0
 
     # Must be called before any color setup
     curses.start_color()
@@ -216,12 +261,15 @@ def main(screen, path):
             | color_from_pair(CursesColor.YELLOW, CursesColor.DEFAULT)
         )
 
+    def render_top_banner():
+        screen.addstr(0, 0, f"Cursor new pos: {cursor.x, cursor.y}")
+        screen.addstr(1, 0, f"Frame: {frame}")
+
     clear_window()
 
-    screen.addstr(0, 0, f"Cursor new pos: {cursor.x, cursor.y}")
+    render_top_banner()
     screen.refresh()
 
-    update_grid(grid)
     render_grid(window, grid)
     draw_cursor(cursor)
 
@@ -229,7 +277,10 @@ def main(screen, path):
 
     while True:
         k = window.getch()
-        if k == curses.KEY_UP:
+        if k == ord(" "):
+            frame += 1
+            update_grid(grid, frame)
+        elif k == curses.KEY_UP:
             cursor.move_up()
         elif k == curses.KEY_DOWN:
             cursor.move_down()
@@ -240,12 +291,11 @@ def main(screen, path):
         else:
             pass
 
-        screen.addstr(0, 0, f"Cursor new pos: {cursor.x, cursor.y}")
+        render_top_banner()
         screen.refresh()
 
         clear_window()
 
-        update_grid(grid)
         render_grid(window, grid)
         draw_cursor(cursor)
 
