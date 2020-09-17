@@ -1,8 +1,11 @@
 import abc
 import logging
+import math
 
 
-from orca_utils import glyph_table_index_of, glyph_table_value_at
+from orca_utils import (
+    BANG_GLYPH, DOT_GLYPH, glyph_table_index_of, glyph_table_value_at
+)
 
 
 logger = logging.getLogger("operators")
@@ -38,6 +41,18 @@ class IOperator(abc.ABC):
     def run(self, frame):
         pass
 
+    def listen(self, port, to_value=False):
+        glyph = self._grid.peek(port.x, port.y)
+        if glyph in (DOT_GLYPH, BANG_GLYPH) and port.default is not None:
+            value = port.default
+        else:
+            value = glyph
+
+        if to_value:
+            return port.clamp(glyph_table_index_of(value))
+        else:
+            return value
+
 
 class Add(IOperator):
     def __init__(self, grid, x, y, passive=False):
@@ -55,26 +70,38 @@ class Add(IOperator):
     def run(self, frame):
         a_port = self.ports["a"]
         b_port = self.ports["b"]
-        a = self._grid.peek(a_port.x, a_port.y)
-        b = self._grid.peek(b_port.x, b_port.y)
 
-        index = glyph_table_index_of(a) + glyph_table_index_of(b)
-        value = glyph_table_value_at(index)
+        index = (
+            self.listen(self.ports["a"], True) + self.listen(self.ports["b"], True)
+        )
+        return glyph_table_value_at(index)
 
-        logger.debug("add: %s, %s -> table[%d] = %s", a, b, index, value)
 
-        # FIXME: orca-js seems to have complicated logic about when to upper the
-        # output in this case, based on the operator sensitivity and the right
-        # operand.
-        if b.isupper():
-            value = value.upper()
 
-        output_port = self.ports["output"]
-        self._grid.poke(output_port.x, output_port.y, value)
+class Clock(IOperator):
+    def __init__(self, grid, x, y, passive=False):
+        self.x = x
+        self.y = y
+
+        self.ports = {
+            "rate": InputPort(x - 1, y, clamp=lambda x: max(1, x)),
+            "mod": InputPort(x + 1, y, default='8'),
+            "output": OutputPort(x, y + 1, sensitive=True)
+        }
+
+        self._grid = grid
+
+    def run(self, frame):
+        rate = self.listen(self.ports["rate"], True)
+        mod = self.listen(self.ports["mod"], True)
+
+        output = math.floor(frame / rate) % mod
+        return glyph_table_value_at(output)
 
 
 _CHAR_TO_OPERATOR_CLASS = {
     "a": Add,
+    "c": Clock,
 }
 
 
