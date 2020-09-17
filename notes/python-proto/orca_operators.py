@@ -37,6 +37,17 @@ class OutputPort(IPort):
 
 
 class IOperator(abc.ABC):
+    def __init__(self, grid, x, y, passive=False):
+        self.x = x
+        self.y = y
+
+        self.ports = {}
+
+        self._grid = grid
+
+        self.is_passive = passive
+        self.do_draw = passive
+
     @abc.abstractmethod
     def run(self, frame):
         pass
@@ -56,16 +67,13 @@ class IOperator(abc.ABC):
 
 class Add(IOperator):
     def __init__(self, grid, x, y, passive=False):
-        self.x = x
-        self.y = y
+        super().__init__(grid, x, y, passive=passive)
 
-        self.ports = {
+        self.ports.update({
             "a": InputPort(x - 1, y),
             "b": InputPort(x + 1, y),
             "output": OutputPort(x, y + 1, sensitive=True)
-        }
-
-        self._grid = grid
+        })
 
     def run(self, frame):
         a_port = self.ports["a"]
@@ -80,16 +88,13 @@ class Add(IOperator):
 
 class Clock(IOperator):
     def __init__(self, grid, x, y, passive=False):
-        self.x = x
-        self.y = y
+        super().__init__(grid, x, y, passive=passive)
 
-        self.ports = {
+        self.ports.update({
             "rate": InputPort(x - 1, y, clamp=lambda x: max(1, x)),
             "mod": InputPort(x + 1, y, default='8'),
             "output": OutputPort(x, y + 1, sensitive=True)
-        }
-
-        self._grid = grid
+        })
 
     def run(self, frame):
         rate = self.listen(self.ports["rate"], True)
