@@ -5,14 +5,16 @@ import enum
 import logging
 import sys
 
+import orca_operators
 import orca_format
+import orca_utils
 
+from orca_utils import (
+    CROSS_GLYPH, CURSOR_GLYPH, DOT_GLYPH, glyph_table_index_of,
+    glyph_table_value_at
+)
 
 logger = logging.getLogger(__name__)
-
-CURSOR_GLYPH = "@"
-CROSS_GLYPH = "+"
-DOT_GLYPH = "."
 
 
 @contextlib.contextmanager
@@ -97,40 +99,6 @@ def pair_to_index(fg, bg):
 def color_from_pair(fg, bg):
     return curses.color_pair(pair_to_index(fg, bg))
 
-GLYPH_TABLE = [
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', #  0-11
-    'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', # 12-23
-    'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', # 24-35
-]
-GLYPH_SIZE = len(GLYPH_TABLE)
-INDEX_TO_GLYPH = {k: i for i, k in enumerate(GLYPH_TABLE)}
-
-ORD_0 = ord('0')
-ORD_9 = ord('9')
-ORD_a = ord('a')
-ORD_z = ord('z')
-ORD_A = ord('A')
-ORD_Z = ord('Z')
-
-
-def index_of_orca_js(c):
-    return INDEX_TO_GLYPH.get(c.lower(), -1)
-
-
-def index_of_orca_c(c):
-    ord_c = ord(c)
-    if ord_c >= ORD_0 and ord_c <= ORD_9:
-        return ord_c - ORD_0
-    elif ord_c >= ORD_a and ord_c <= ORD_z:
-        return ord_c - ORD_a
-    elif ord_c >= ORD_A and ord_c <= ORD_Z:
-        return ord_c - ORD_A
-    else:
-        return 0
-
-
-index_of = index_of_orca_js
-
 
 class KrillGrid:
     @classmethod
@@ -180,9 +148,11 @@ class KrillGrid:
 def operator_add(grid, i, j):
     a = grid.peek(i, j - 1)
     b = grid.peek(i, j + 1)
-    index = index_of(a) + index_of(b)
-    value = GLYPH_TABLE[index % GLYPH_SIZE]
+    index = glyph_table_index_of(a) + glyph_table_index_of(b)
+    value = glyph_table_value_at(index)
+
     logger.debug("add: %s, %s -> table[%d] = %s", a, b, index, value)
+
     # FIXME: orca-js seems to have complicated logic about when to upper the
     # output in this case, based on the operator sensitivity and the right
     # operand.
@@ -191,15 +161,23 @@ def operator_add(grid, i, j):
     grid.poke(i + 1, j, value)
 
 
-def update_grid(grid):
+def parse_grid(grid):
+    operators = []
     for i, row in enumerate(grid.iter_rows()):
         for j, c in enumerate(row):
-            if c == ".":
-                continue
-            elif c == "A":
-                operator_add(grid, i, j)
-            else:
-                pass
+            if c != DOT_GLYPH:
+                operator = orca_operators.operator_factory(grid, c, i, j)
+                if operator is not None:
+                    operators.append(operator)
+                else:
+                    logger.debug("No operator found for glyph %r", c)
+
+    return operators
+
+
+def update_grid(grid):
+    operators = parse_grid(grid)
+    logger.debug("Found %d operators", len(operators))
 
 
 def render_grid(window, grid):
