@@ -207,31 +207,7 @@ def update_grid(grid, frame):
 
     for operator in operators:
         logger.debug("Looking at operator %s, pos %d, %d", operator, operator.x, operator.y)
-        for port in operator.ports.values():
-            if isinstance(port, orca_operators.OutputPort) and port.is_bang:
-                continue
-
-            logger.debug("Locking port @ %d, %d", port.x, port.y)
-            grid.lock(port.x, port.y)
-
-    operators = [
-        operator for operator in operators if not grid.is_operator_locked(operator)
-    ]
-    logger.debug("Found %d unlocked operators", len(operators))
-
-    for operator in operators:
-        payload = operator.run(frame)
-        if "output" in operator.ports:
-
-            # FIXME: orca-js seems to have complicated logic about when to upper the
-            # output in this case, based on the operator sensitivity and the right
-            # operand.
-            if payload.isupper():
-                payload = payload.upper()
-
-            port = operator.ports["output"]
-            grid.poke(port.x, port.y, payload)
-
+        operator.run(frame)
 
 
 def render_grid(window, grid):

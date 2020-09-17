@@ -49,8 +49,29 @@ class IOperator(abc.ABC):
         self.do_draw = passive
 
     @abc.abstractmethod
-    def run(self, frame):
+    def operation(self, frame, force=False):
         pass
+
+    def run(self, frame, force=False):
+        payload = self.operation(frame, force)
+
+        for port in self.ports.values():
+            if isinstance(port, OutputPort) and port.is_bang:
+                continue
+            logger.debug("Locking port @ %d, %d", port.x, port.y)
+            self._grid.lock(port.x, port.y)
+
+        if "output" in self.ports:
+            output_port = self.ports["output"]
+            if output_port.is_bang:
+                raise ValueError("Output bang not implemented yet")
+            else:
+                # FIXME: orca-js seems to have complicated logic about when to upper the
+                # output in this case, based on the operator sensitivity and the right
+                # operand.
+                if payload.isupper():
+                    payload = payload.upper()
+                self._grid.poke(port.x, port.y, payload)
 
     def listen(self, port, to_value=False):
         glyph = self._grid.peek(port.x, port.y)
@@ -75,7 +96,7 @@ class Add(IOperator):
             "output": OutputPort(x, y + 1, sensitive=True)
         })
 
-    def run(self, frame):
+    def operation(self, frame, force=False):
         a_port = self.ports["a"]
         b_port = self.ports["b"]
 
@@ -96,7 +117,7 @@ class Clock(IOperator):
             "output": OutputPort(x, y + 1, sensitive=True)
         })
 
-    def run(self, frame):
+    def operation(self, frame, force=False):
         rate = self.listen(self.ports["rate"], True)
         mod = self.listen(self.ports["mod"], True)
 
