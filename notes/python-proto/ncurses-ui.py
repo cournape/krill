@@ -207,6 +207,8 @@ def update_grid(grid, frame):
 
     for operator in operators:
         logger.debug("Looking at operator %s, pos %d, %d", operator, operator.x, operator.y)
+        if grid.is_locked(operator.x, operator.y):
+            continue
         operator.run(frame)
 
 
