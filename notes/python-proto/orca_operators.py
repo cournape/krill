@@ -70,9 +70,12 @@ class IOperator(abc.ABC):
             else:
                 # FIXME: orca-js seems to have complicated logic about when to upper the
                 # output in this case, based on the operator sensitivity and the right
-                # operand.
-                if payload.isupper():
-                    payload = payload.upper()
+                # operand (operator.shouldUpperCase method)
+                if output_port.is_sensitive:
+                    right_port = InputPort(self.x + 1 ,self.y)
+                    right_operand = self.listen(right_port)
+                    if right_operand.isupper():
+                        payload = payload.upper()
                 self._grid.poke(port.x, port.y, payload)
 
     def listen(self, port, to_value=False):
