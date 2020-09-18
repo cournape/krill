@@ -37,7 +37,7 @@ class OutputPort(IPort):
 
 
 class IOperator(abc.ABC):
-    def __init__(self, grid, x, y, passive=False):
+    def __init__(self, grid, x, y, *, glyph=DOT_GLYPH, passive=False):
         self.x = x
         self.y = y
 
@@ -47,6 +47,8 @@ class IOperator(abc.ABC):
 
         self.is_passive = passive
         self.do_draw = passive
+
+        self.glyph = glyph.upper() if passive else glyph
 
     @abc.abstractmethod
     def operation(self, frame, force=False):
@@ -58,7 +60,7 @@ class IOperator(abc.ABC):
         for port in self.ports.values():
             if isinstance(port, OutputPort) and port.is_bang:
                 continue
-            logger.debug("Locking port @ %d, %d", port.x, port.y)
+            logger.debug("Ops %d, %d: locking port @ %d, %d", self.x, self.y, port.x, port.y)
             self._grid.lock(port.x, port.y)
 
         if "output" in self.ports:
@@ -87,8 +89,8 @@ class IOperator(abc.ABC):
 
 
 class Add(IOperator):
-    def __init__(self, grid, x, y, passive=False):
-        super().__init__(grid, x, y, passive=passive)
+    def __init__(self, grid, x, y, *, passive=False):
+        super().__init__(grid, x, y, glyph="a", passive=passive)
 
         self.ports.update({
             "a": InputPort(x - 1, y),
@@ -106,10 +108,9 @@ class Add(IOperator):
         return glyph_table_value_at(index)
 
 
-
 class Clock(IOperator):
-    def __init__(self, grid, x, y, passive=False):
-        super().__init__(grid, x, y, passive=passive)
+    def __init__(self, grid, x, y, glyph=DOT_GLYPH, passive=False):
+        super().__init__(grid, x, y, glyph="c", passive=passive)
 
         self.ports.update({
             "rate": InputPort(x - 1, y, clamp=lambda x: max(1, x)),
@@ -138,12 +139,10 @@ def operator_factory(grid, grid_char, x, y):
     """
     klass =  _CHAR_TO_OPERATOR_CLASS.get(grid_char.lower())
     if klass is not None:
-        return klass(grid, x, y, grid_char.isupper())
+        return klass(grid, x, y, passive=grid_char.isupper())
     else:
         return None
 
 
 def default_clamp(v):
     return v
-
-
