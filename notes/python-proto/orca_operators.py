@@ -129,9 +129,38 @@ class Clock(IOperator):
         return glyph_table_value_at(output)
 
 
+class East(IOperator):
+    def __init__(self, grid, x, y, *, passive=False):
+        super().__init__(grid, x, y, glyph="e", passive=passive)
+        self.do_draw = False
+
+    def operation(self, frame, force=False):
+        offset_x, offset_y = 1, 0
+        new_x = self.x + offset_x
+        new_y = self.y + offset_x
+        if not self._grid.is_inside(new_x, new_y):
+            raise ValueError("Explode, but not implemented !")
+
+        collider = self._grid.peek(new_x, new_y)
+        if collider not in (BANG_GLYPH, DOT_GLYPH):
+            raise ValueError("Explode, but not implemented !")
+
+        # Erase
+        self._grid.poke(self.x, self.y, DOT_GLYPH)
+        # Change coordinates
+        self.x += offset_x
+        self.y += offset_y
+        # Redraw at new pos
+        self._grid.poke(self.x, self.y, self.glyph)
+        if self._grid.is_inside(self.x, self.y):
+            self._grid.lock(self.x, self.y)
+
+
+
 _CHAR_TO_OPERATOR_CLASS = {
     "a": Add,
     "c": Clock,
+    "e": East,
 }
 
 

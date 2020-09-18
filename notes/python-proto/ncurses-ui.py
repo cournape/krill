@@ -130,6 +130,9 @@ class KrillGrid:
 
         self.reset_locks()
 
+    def is_inside(self, x, y):
+        return x >= 0 and x < self.cols and y >= 0 and y < self.rows
+
     def reset_locks(self):
         self._locks = [
             [False for _ in range(self.cols)]
