@@ -63,7 +63,7 @@ class IOperator(abc.ABC):
 
     def move(self, offset_x, offset_y):
         new_x = self.x + offset_x
-        new_y = self.y + offset_x
+        new_y = self.y + offset_y
         if not self._grid.is_inside(new_x, new_y):
             self.explode()
             return
