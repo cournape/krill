@@ -140,6 +140,16 @@ class Add(IOperator):
         return glyph_table_value_at(index)
 
 
+class Bang(IOperator):
+    def __init__(self, grid, x, y, *, passive=False):
+        super().__init__(grid, x, y, glyph=BANG_GLYPH, passive=passive)
+        self.do_draw = False
+
+    def operation(self, frame, force=False):
+        self.do_draw = False
+        self.erase()
+
+
 class Clock(IOperator):
     def __init__(self, grid, x, y, glyph=DOT_GLYPH, passive=False):
         super().__init__(grid, x, y, glyph="c", passive=passive)
@@ -184,6 +194,7 @@ _CHAR_TO_OPERATOR_CLASS = {
     "a": Add,
     "c": Clock,
     "e": East,
+    BANG_GLYPH: Bang,
     COMMENT_GLYPH: Comment,
 }
 
