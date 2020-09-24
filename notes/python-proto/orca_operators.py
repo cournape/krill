@@ -4,7 +4,8 @@ import math
 
 
 from orca_utils import (
-    BANG_GLYPH, COMMENT_GLYPH, DOT_GLYPH, glyph_table_index_of, glyph_table_value_at
+    BANG_GLYPH, COMMENT_GLYPH, DOT_GLYPH, EMPTY_GLYPH, glyph_table_index_of,
+    glyph_table_value_at
 )
 
 
@@ -53,6 +54,34 @@ class IOperator(abc.ABC):
     @abc.abstractmethod
     def operation(self, frame, force=False):
         pass
+
+    def erase(self):
+        self._grid.poke(self.x, self.y, EMPTY_GLYPH)
+
+    def explode(self):
+        self._grid.poke(self.x, self.y, BANG_GLYPH)
+
+    def move(self, offset_x, offset_y):
+        new_x = self.x + offset_x
+        new_y = self.y + offset_x
+        if not self._grid.is_inside(new_x, new_y):
+            self.explode()
+            return
+
+        collider = self._grid.peek(new_x, new_y)
+        if collider not in (BANG_GLYPH, DOT_GLYPH):
+            self.explode()
+            return
+
+        # Erase
+        self._grid.poke(self.x, self.y, DOT_GLYPH)
+        # Change coordinates
+        self.x += offset_x
+        self.y += offset_y
+        # Redraw at new pos
+        self._grid.poke(self.x, self.y, self.glyph)
+        if self._grid.is_inside(self.x, self.y):
+            self._grid.lock(self.x, self.y)
 
     def run(self, frame, force=False):
         payload = self.operation(frame, force)
@@ -148,26 +177,7 @@ class East(IOperator):
         self.do_draw = False
 
     def operation(self, frame, force=False):
-        offset_x, offset_y = 1, 0
-        new_x = self.x + offset_x
-        new_y = self.y + offset_x
-        if not self._grid.is_inside(new_x, new_y):
-            raise ValueError("Explode, but not implemented !")
-
-        collider = self._grid.peek(new_x, new_y)
-        if collider not in (BANG_GLYPH, DOT_GLYPH):
-            raise ValueError("Explode, but not implemented !")
-
-        # Erase
-        self._grid.poke(self.x, self.y, DOT_GLYPH)
-        # Change coordinates
-        self.x += offset_x
-        self.y += offset_y
-        # Redraw at new pos
-        self._grid.poke(self.x, self.y, self.glyph)
-        if self._grid.is_inside(self.x, self.y):
-            self._grid.lock(self.x, self.y)
-
+        self.move(1, 0)
 
 
 _CHAR_TO_OPERATOR_CLASS = {
