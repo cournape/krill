@@ -151,7 +151,7 @@ class Bang(IOperator):
 
 
 class Clock(IOperator):
-    def __init__(self, grid, x, y, glyph=DOT_GLYPH, passive=False):
+    def __init__(self, grid, x, y, *, passive=False):
         super().__init__(grid, x, y, glyph="c", passive=passive)
 
         self.ports.update({
