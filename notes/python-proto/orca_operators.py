@@ -73,12 +73,9 @@ class IOperator(abc.ABC):
             self.explode()
             return
 
-        # Erase
-        self._grid.poke(self.x, self.y, DOT_GLYPH)
-        # Change coordinates
+        self.erase()
         self.x += offset_x
         self.y += offset_y
-        # Redraw at new pos
         self._grid.poke(self.x, self.y, self.glyph)
         if self._grid.is_inside(self.x, self.y):
             self._grid.lock(self.x, self.y)
