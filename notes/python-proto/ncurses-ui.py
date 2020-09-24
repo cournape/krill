@@ -10,7 +10,7 @@ import orca_format
 import orca_utils
 
 from orca_utils import (
-    CROSS_GLYPH, CURSOR_GLYPH, DOT_GLYPH, glyph_table_index_of,
+    CROSS_GLYPH, CURSOR_GLYPH, DOT_GLYPH, EMPTY_GLYPH, glyph_table_index_of,
     glyph_table_value_at
 )
 
@@ -219,7 +219,11 @@ def update_grid(grid, frame):
 def render_grid(window, grid):
     for i, row in enumerate(grid.iter_rows()):
         window.move(i, 0)
-        window.addstr("".join(row))
+        rendered_row = (
+            c if c != DOT_GLYPH else EMPTY_GLYPH
+            for c in row
+        )
+        window.addstr("".join(rendered_row))
 
 
 def main(screen, path):
