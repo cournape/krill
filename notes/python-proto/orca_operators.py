@@ -56,7 +56,7 @@ class IOperator(abc.ABC):
         pass
 
     def erase(self):
-        self._grid.poke(self.x, self.y, EMPTY_GLYPH)
+        self._grid.poke(self.x, self.y, DOT_GLYPH)
 
     def explode(self):
         self._grid.poke(self.x, self.y, BANG_GLYPH)
