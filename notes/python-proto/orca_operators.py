@@ -4,7 +4,7 @@ import math
 
 
 from orca_utils import (
-    BANG_GLYPH, DOT_GLYPH, glyph_table_index_of, glyph_table_value_at
+    BANG_GLYPH, COMMENT_GLYPH, DOT_GLYPH, glyph_table_index_of, glyph_table_value_at
 )
 
 
@@ -129,6 +129,19 @@ class Clock(IOperator):
         return glyph_table_value_at(output)
 
 
+class Comment(IOperator):
+    def __init__(self, grid, x, y, *, passive=False):
+        super().__init__(grid, x, y, glyph=COMMENT_GLYPH, passive=passive)
+        self.do_draw = False
+
+    def operation(self, frame, force=False):
+        self._grid.lock(self.x, self.y)
+        for x in range(self.x + 1, self._grid.cols):
+            self._grid.lock(x, self.y)
+            if self._grid.peek(x, self.y) == self.glyph:
+                break
+
+
 class East(IOperator):
     def __init__(self, grid, x, y, *, passive=False):
         super().__init__(grid, x, y, glyph="e", passive=passive)
@@ -161,6 +174,7 @@ _CHAR_TO_OPERATOR_CLASS = {
     "a": Add,
     "c": Clock,
     "e": East,
+    COMMENT_GLYPH: Comment,
 }
 
 

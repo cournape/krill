@@ -211,6 +211,7 @@ def update_grid(grid, frame):
     for operator in operators:
         logger.debug("Looking at operator %s, pos %d, %d", operator, operator.x, operator.y)
         if grid.is_locked(operator.x, operator.y):
+            logger.debug("operator %s @ %d, %d is locked", operator, operator.x, operator.y)
             continue
         operator.run(frame)
 
@@ -271,6 +272,7 @@ def main(screen, path):
         k = window.getch()
         if k == ord(" "):
             frame += 1
+            logging.debug("Frame %r", frame)
             update_grid(grid, frame)
         elif k == curses.KEY_UP:
             cursor.move_up()
