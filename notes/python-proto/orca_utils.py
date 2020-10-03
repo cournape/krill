@@ -42,3 +42,11 @@ glyph_table_index_of = index_of_orca_js
 
 def glyph_table_value_at(index):
     return GLYPH_TABLE[index % GLYPH_TABLE_SIZE]
+
+
+# equivalent of orca.valueOf
+def glyph_to_value(glyph):
+    if glyph in (DOT_GLYPH, BANG_GLYPH, None, ""):
+        return 0
+    else:
+        return glyph_table_index_of(glyph)

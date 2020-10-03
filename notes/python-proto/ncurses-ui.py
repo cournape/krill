@@ -5,8 +5,8 @@ import enum
 import logging
 import sys
 
+import krill_grid
 import orca_operators
-import orca_format
 import orca_utils
 
 from orca_utils import (
@@ -100,78 +100,6 @@ def color_from_pair(fg, bg):
     return curses.color_pair(pair_to_index(fg, bg))
 
 
-class KrillGrid:
-    @classmethod
-    def from_path(cls, path):
-        raw = orca_format.load_orca_file(path)
-
-        rows = len(raw)
-        cols = len(raw[0])
-        ret = cls(rows, cols)
-        ret._state = raw
-        return ret
-
-    def __init__(self, rows, cols):
-        self.rows = rows
-        self.cols = cols
-
-        # Raw state of the grid at a given state
-        self._state = [
-            ["." for _ in range(cols)]
-            for _ in range(rows)
-        ]
-
-        # Each grid's position may be locked, in which case it should not be
-        # processed as an operator. For example, if the right operator of add
-        # is itself a letter, you want to make sure you're not considering it
-        # as its own operator. Here we rely on orca processing from the left to
-        # the right, and from the top to the bottom.
-        self._locks = None
-
-        self.reset_locks()
-
-    def is_inside(self, x, y):
-        return x >= 0 and x < self.cols and y >= 0 and y < self.rows
-
-    def reset_locks(self):
-        self._locks = [
-            [False for _ in range(self.cols)]
-            for _ in range(self.rows)
-        ]
-
-    def iter_rows(self):
-        return iter(self._state)
-
-    def lock(self, x, y):
-        self._locks[y][x] = True
-
-    def is_operator_locked(self, operator):
-        return self.is_locked(operator.x, operator.y)
-
-    def is_locked(self, x, y):
-        return self._locks[y][x]
-
-    def peek(self, x, y):
-        """ Returns the glyph at the given indices.
-
-        Will return no-op (".") if outside the grid boundaries.
-        """
-        try:
-            return self._state[y][x]
-        except IndexError:
-            return "."
-
-    def poke(self, x, y, value):
-        """ Will set the given value at the given position in the grid.
-
-        Will do nothing if outside the grid boundaries.
-        """
-        try:
-            self._state[y][x] = value
-        except IndexError:
-            return
-
-
 def operator_add(grid, i, j):
     a = grid.peek(i, j - 1)
     b = grid.peek(i, j + 1)
@@ -227,7 +155,7 @@ def render_grid(window, grid):
 
 
 def main(screen, path):
-    grid = KrillGrid.from_path(path)
+    grid = krill_grid.KrillGrid.from_path(path)
 
     top_x = 20
     top_y = 5

@@ -5,7 +5,7 @@ import math
 
 from orca_utils import (
     BANG_GLYPH, COMMENT_GLYPH, DOT_GLYPH, EMPTY_GLYPH, glyph_table_index_of,
-    glyph_table_value_at
+    glyph_to_value
 )
 
 
@@ -112,7 +112,7 @@ class IOperator(abc.ABC):
             value = glyph
 
         if to_value:
-            return port.clamp(glyph_table_index_of(value))
+            return port.clamp(glyph_to_value(value))
         else:
             return value
 
@@ -187,10 +187,38 @@ class East(IOperator):
         self.move(1, 0)
 
 
+class Generator(IOperator):
+    def __init__(self, grid, x, y, *, passive=False):
+        super().__init__(grid, x, y, glyph="g", passive=passive)
+        self.do_draw = False
+
+        self.ports.update({
+            "x": InputPort(x - 3, y),
+            "y": InputPort(x - 2, y),
+            "length": InputPort(x - 1, y, clamp=lambda x: max(1, x)),
+        })
+
+    def operation(self, frame, force=False):
+        x = self.listen(self.ports["x"], True) 
+        y = self.listen(self.ports["y"], True) 
+        length = self.listen(self.ports["length"], True) 
+
+        for offset in range(length):
+            input_port = InputPort(self.x + offset + 1, self.y)
+            output_port = OutputPort(self.x + offset + x, y)
+            self.ports.update({
+                f"in{offset}": input_port,
+                f"out{offset}": output_port,
+            })
+            res = self.listen(input_port)
+            self._grid.poke(output_port.x, output_port.y, res)
+
+
 _CHAR_TO_OPERATOR_CLASS = {
     "a": Add,
     "c": Clock,
     "e": East,
+    "g": Generator,
     BANG_GLYPH: Bang,
     COMMENT_GLYPH: Comment,
 }
