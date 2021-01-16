@@ -1,27 +1,47 @@
-extern crate midir;
+use std::error;
+use std::io::{Stdout, stdout, Write};
 
-use std::error::Error;
-use std::process;
+use std::thread;
+use std::time::Duration;
 
-use midir::{MidiOutput};
+use tui::Terminal;
+use tui::backend::CrosstermBackend;
+use crossterm::{
+    event::{EnableMouseCapture, DisableMouseCapture},
+    execute,
+    terminal::{enable_raw_mode, disable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
 
-fn main() {
-    match run() {
-        Ok(_) => (),
-        Err(err) => {
-            println!("Error: {}", err);
-            process::exit(1);
-        }
-    }
+
+fn initialize_terminal(stdout: &mut Stdout) -> Result<Terminal<CrosstermBackend<&mut Stdout>>, Box<dyn error::Error>> {
+    enable_raw_mode()?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    terminal.hide_cursor()?;
+
+    Ok(terminal)
 }
 
-fn run() -> Result<(), Box<dyn Error>> {
-    let midi_out = MidiOutput::new("midir test output")?;
+fn deinit_terminal(terminal: &mut Terminal<CrosstermBackend<&mut Stdout>>) -> Result<(), Box<dyn error::Error>> {
+    terminal.show_cursor()?;
 
-    println!("\n{} available output ports", midi_out.ports().len());
-    for (i, p) in midi_out.ports().iter().enumerate() {
-        println!("    {}: {}", i, midi_out.port_name(p)?);
-    }
+    let mut stdout = stdout();
+    execute!(stdout, DisableMouseCapture, LeaveAlternateScreen)?;
+    disable_raw_mode()?;
+
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut stdout = stdout();
+    let mut terminal = initialize_terminal(&mut stdout)?;
+
+    thread::sleep(Duration::from_millis(1000));
+
+    deinit_terminal(&mut terminal)?;
 
     Ok(())
 }
